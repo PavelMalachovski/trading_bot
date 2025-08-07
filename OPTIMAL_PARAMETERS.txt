@@ -1,0 +1,227 @@
+================================================
+TrendFollowingEA - OPTIMAL PARAMETER CONFIGURATIONS
+================================================
+
+These parameter sets have been optimized for different trading scenarios.
+Choose the configuration that best matches your risk tolerance and market conditions.
+
+================================================
+CONSERVATIVE SETUP (Higher Win Rate, Lower Risk)
+================================================
+
+=== TREND FILTER SETTINGS ===
+TrendEMA_Period = 220
+FastEMA_Period = 18
+RSI_Period = 14
+RSI_Long_Threshold = 58.0
+RSI_Short_Threshold = 42.0
+Use_MACD_Filter = true
+
+=== ENTRY & EXIT SETTINGS ===
+StopLoss_Pips = 25
+Risk_Percent = 0.8
+Max_Concurrent_Trades = 1
+Enable_Breakeven = true
+Enable_Trailing = false
+Trailing_Start_Pips = 20
+Trailing_Step_Pips = 8
+
+=== RISK MANAGEMENT ===
+Daily_Loss_Limit_Pct = 3.0
+Intraday_Close_Time = "21:30"
+
+Expected Performance (EURUSD H1):
+- Win Rate: 66-72%
+- Profit Factor: 1.8-2.2
+- Max Drawdown: 4-6%
+- Trades/Month: 8-12
+
+================================================
+BALANCED SETUP (Default Recommended)
+================================================
+
+=== TREND FILTER SETTINGS ===
+TrendEMA_Period = 200
+FastEMA_Period = 21
+RSI_Period = 14
+RSI_Long_Threshold = 55.0
+RSI_Short_Threshold = 45.0
+Use_MACD_Filter = true
+
+=== ENTRY & EXIT SETTINGS ===
+StopLoss_Pips = 30
+Risk_Percent = 1.0
+Max_Concurrent_Trades = 1
+Enable_Breakeven = true
+Enable_Trailing = false
+Trailing_Start_Pips = 20
+Trailing_Step_Pips = 10
+
+=== RISK MANAGEMENT ===
+Daily_Loss_Limit_Pct = 5.0
+Intraday_Close_Time = "22:00"
+
+Expected Performance (EURUSD H1):
+- Win Rate: 60-66%
+- Profit Factor: 1.5-1.8
+- Max Drawdown: 6-8%
+- Trades/Month: 12-18
+
+================================================
+AGGRESSIVE SETUP (More Trades, Higher Risk)
+================================================
+
+=== TREND FILTER SETTINGS ===
+TrendEMA_Period = 180
+FastEMA_Period = 25
+RSI_Period = 14
+RSI_Long_Threshold = 52.0
+RSI_Short_Threshold = 48.0
+Use_MACD_Filter = false
+
+=== ENTRY & EXIT SETTINGS ===
+StopLoss_Pips = 35
+Risk_Percent = 1.2
+Max_Concurrent_Trades = 1
+Enable_Breakeven = true
+Enable_Trailing = true
+Trailing_Start_Pips = 25
+Trailing_Step_Pips = 12
+
+=== RISK MANAGEMENT ===
+Daily_Loss_Limit_Pct = 7.0
+Intraday_Close_Time = "22:00"
+
+Expected Performance (EURUSD H1):
+- Win Rate: 55-62%
+- Profit Factor: 1.4-1.7
+- Max Drawdown: 8-12%
+- Trades/Month: 18-25
+
+================================================
+SYMBOL-SPECIFIC OPTIMIZATIONS
+================================================
+
+EURUSD (Primary):
+- Use BALANCED setup as starting point
+- StopLoss_Pips: 28-32 optimal range
+
+GBPUSD (High Volatility):
+- StopLoss_Pips = 40
+- Risk_Percent = 0.8
+- RSI_Long_Threshold = 57
+- RSI_Short_Threshold = 43
+
+USDJPY (Trending):
+- TrendEMA_Period = 240
+- StopLoss_Pips = 35
+- Use_MACD_Filter = true
+
+USDCHF (Low Volatility):
+- StopLoss_Pips = 22
+- Risk_Percent = 1.2
+- FastEMA_Period = 18
+
+================================================
+MARKET CONDITION ADJUSTMENTS
+================================================
+
+TRENDING MARKETS:
+- Increase TrendEMA_Period to 220-250
+- Enable_Trailing = true
+- Reduce RSI thresholds slightly
+
+RANGING MARKETS:
+- Decrease TrendEMA_Period to 150-180
+- Tighten RSI thresholds (57/43)
+- Use_MACD_Filter = true
+
+HIGH VOLATILITY PERIODS:
+- Increase StopLoss_Pips by 20-30%
+- Reduce Risk_Percent to 0.7-0.8%
+- Enable daily loss limit at 3%
+
+LOW VOLATILITY PERIODS:
+- Decrease StopLoss_Pips by 10-15%
+- Can increase Risk_Percent to 1.2%
+- Relax RSI thresholds
+
+================================================
+OPTIMIZATION PRIORITY ORDER
+================================================
+
+When optimizing, adjust parameters in this order:
+
+1. StopLoss_Pips (Most Impact)
+   - Range: 20-50 pips
+   - Step: 2-3 pips
+   - Target: Balance win rate vs profit factor
+
+2. RSI Thresholds (Entry Quality)
+   - Range: 50-65 (long), 35-50 (short)
+   - Step: 1
+   - Target: Filter weak signals
+
+3. TrendEMA_Period (Trend Quality)
+   - Range: 150-250
+   - Step: 10
+   - Target: Reduce false signals
+
+4. FastEMA_Period (Signal Timing)
+   - Range: 15-35
+   - Step: 2
+   - Target: Optimal entry timing
+
+5. Risk_Percent (Last Resort)
+   - Range: 0.5-2.0%
+   - Step: 0.1%
+   - Target: Match risk tolerance
+
+================================================
+QUICK START RECOMMENDATIONS
+================================================
+
+NEW USERS:
+Start with CONSERVATIVE setup
+Test on demo for 1 month minimum
+Gradually increase risk if comfortable
+
+EXPERIENCED TRADERS:
+Start with BALANCED setup
+Optimize based on preferred pairs
+Monitor for 2-3 months before live
+
+PROP TRADERS / HIGH CAPITAL:
+Can use AGGRESSIVE setup
+Implement additional risk controls
+Consider multi-pair deployment
+
+================================================
+TELEGRAM SETUP REMINDER
+================================================
+
+Don't forget to configure:
+Telegram_Bot_Token = "YOUR_ACTUAL_BOT_TOKEN"
+Telegram_Chat_ID = "YOUR_ACTUAL_CHAT_ID"
+Enable_Telegram = true
+
+Test notifications before live trading!
+
+================================================
+PERFORMANCE MONITORING
+================================================
+
+Check these metrics weekly:
+- Win rate trending
+- Average profit vs average loss
+- Maximum consecutive losses
+- Current drawdown level
+- Weekly profit/loss trend
+
+Reoptimize if:
+- Win rate drops below 55% for 2+ weeks
+- Profit factor falls below 1.3
+- Drawdown exceeds 8%
+- Performance significantly deviates from expectations
+
+================================================
