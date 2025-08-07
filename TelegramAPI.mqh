@@ -1,198 +1,223 @@
 //+------------------------------------------------------------------+
-//|                                                  TelegramAPI.mqh |
-//|                       Copyright 2024, Professional Trading Bot |
-//|                                             https://example.com |
+//|                                             TelegramAPI_improved.mqh |
+//|                   Enhanced Telegram integration for MT4 EAs       |
+//|                                                                  |
+//|  This module refactors the original TelegramAPI.mqh file used    |
+//|  in the TrendFollowingEA. It adds error handling, configurable   |
+//|  parameters for better security and flexibility, and a generic    |
+//|  message sender capable of toggling Markdown/HTML formatting and |
+//|  disabling notifications.                                        |
+//|                                                                  |
+//|  Author: ChatGPT (refactoring suggestion)                        |
+//|  Date: 2025-08-07                                                |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2024, Professional Trading Bot"
-#property link      "https://example.com"
+
 #property strict
 
+//--- WinInet import declarations for HTTPS requests
 #import "wininet.dll"
-int InternetOpenW(string, int, string, string, int);
-int InternetConnectW(int, string, int, string, string, int, int, int);
-int HttpOpenRequestW(int, string, string, string, string, string, int, int);
+int  InternetOpenW(string, int, string, string, int);
+int  InternetConnectW(int, string, int, string, string, int, int, int);
+int  HttpOpenRequestW(int, string, string, string, string, string, int, int);
 bool HttpSendRequestW(int, string, int, uchar &arr[], int);
 bool InternetReadFile(int, uchar &arr[], int, int &OneInt[]);
 bool InternetCloseHandle(int);
 #import
 
 //+------------------------------------------------------------------+
-//| Send HTTP POST request to Telegram API                           |
+//| Encodes a string for HTTP transmission                           |
 //+------------------------------------------------------------------+
-bool SendTelegramNotification(string bot_token, string chat_id, string message)
-{
-    if(bot_token == "YOUR_BOT_TOKEN_HERE" || chat_id == "YOUR_CHAT_ID_HERE")
-    {
-        Print("Telegram credentials not configured");
-        return false;
-    }
-
-    // URL encode the message
-    string encoded_message = UrlEncode(message);
-
-    // Prepare POST data
-    string post_data = StringFormat("chat_id=%s&text=%s&parse_mode=HTML", chat_id, encoded_message);
-    uchar post_array[];
-    StringToCharArray(post_data, post_array, 0, StringLen(post_data));
-
-    // API endpoint
-    string host = "api.telegram.org";
-    string path = StringFormat("/bot%s/sendMessage", bot_token);
-
-    // Open internet connection
-    int internet = InternetOpenW("TelegramBot/1.0", 1, "", "", 0);
-    if(internet == 0)
-    {
-        Print("Failed to open internet connection");
-        return false;
-    }
-
-    // Connect to Telegram API
-    int connect = InternetConnectW(internet, host, 443, "", "", 3, 0, 0);
-    if(connect == 0)
-    {
-        InternetCloseHandle(internet);
-        Print("Failed to connect to Telegram API");
-        return false;
-    }
-
-    // Open HTTP request
-    int request = HttpOpenRequestW(connect, "POST", path, "HTTP/1.1", "", "", 0x00800000, 0);
-    if(request == 0)
-    {
-        InternetCloseHandle(connect);
-        InternetCloseHandle(internet);
-        Print("Failed to open HTTP request");
-        return false;
-    }
-
-    // Set headers
-    string headers = "Content-Type: application/x-www-form-urlencoded\r\n";
-
-    // Send request
-    bool sent = HttpSendRequestW(request, headers, StringLen(headers), post_array, ArraySize(post_array));
-
-    // Clean up
-    InternetCloseHandle(request);
-    InternetCloseHandle(connect);
-    InternetCloseHandle(internet);
-
-    if(sent)
-    {
-        Print("Telegram notification sent successfully");
-        return true;
-    }
-    else
-    {
-        Print("Failed to send Telegram notification");
-        return false;
-    }
-}
-
-//+------------------------------------------------------------------+
-//| URL encode string for HTTP requests                              |
-//+------------------------------------------------------------------+
-string UrlEncode(string str)
+string UrlEncode(const string str)
 {
     string encoded = "";
     for(int i = 0; i < StringLen(str); i++)
     {
-        int char_code = StringGetCharacter(str, i);
-
-        // Alphanumeric characters and some special chars don't need encoding
-        if((char_code >= 48 && char_code <= 57) ||   // 0-9
-           (char_code >= 65 && char_code <= 90) ||   // A-Z
-           (char_code >= 97 && char_code <= 122) ||  // a-z
-           char_code == 45 || char_code == 95 ||     // - and _
-           char_code == 46 || char_code == 126)      // . and ~
-        {
-            encoded += CharToString(char_code);
-        }
-        else if(char_code == 32) // Space
-        {
+        int c = StringGetCharacter(str, i);
+        // A–Z, a–z, 0–9, hyphen, underscore, period and tilde are safe
+        bool safe = ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) ||
+                     (c >= 97 && c <= 122) || c == 45 || c == 95 ||
+                     c == 46 || c == 126);
+        if(safe)
+            encoded += CharToString(c);
+        else if(c == 32)
             encoded += "+";
-        }
         else
-        {
-            encoded += StringFormat("%%%02X", char_code);
-        }
+            encoded += StringFormat("%%%02X", c);
     }
     return encoded;
 }
 
 //+------------------------------------------------------------------+
-//| Format trade opened message                                      |
+//| Sends an arbitrary message to Telegram using the provided        |
+//| bot token and chat ID. Supports optional HTML/Markdown mode      |
+//| selection and silent notifications. Returns true if the request  |
+//| was dispatched successfully; note that a successful dispatch     |
+//| does not guarantee delivery, only that the request was accepted  |
+//| by WinInet.                                                     |
 //+------------------------------------------------------------------+
-string FormatTradeOpenedMessage(string symbol, string direction, double entry_price,
-                              double stop_loss, double take_profit, double lot_size, double risk_pct)
+bool SendTelegramMessage(
+    const string bot_token,
+    const string chat_id,
+    const string message,
+    const string parse_mode = "HTML",
+    const bool disable_notification = false)
 {
-    string emoji = (direction == "BUY") ? "📈" : "📉";
+    if(StringTrim(bot_token) == "" || StringTrim(chat_id) == "")
+    {
+        Print("Telegram credentials are not configured");
+        return(false);
+    }
 
-    return StringFormat(
-        "<b>%s Trade Opened</b>\n"
-        "📊 <b>%s %s</b>\n"
-        "💱 Entry: <code>%.5f</code>\n"
-        "🛑 SL: <code>%.5f</code>\n"
-        "🎯 TP: <code>%.5f</code>\n"
-        "💰 Size: <code>%.2f</code> lots\n"
-        "📊 Risk: <code>%.1f%%</code>\n"
-        "⏰ %s",
-        emoji, symbol, direction, entry_price, stop_loss, take_profit,
-        lot_size, risk_pct, TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES)
+    // URL-encode the message and build POST payload
+    string encoded = UrlEncode(message);
+    string post_data = StringFormat(
+        "chat_id=%s&text=%s&parse_mode=%s&disable_notification=%s",
+        chat_id, encoded, parse_mode,
+        disable_notification ? "true" : "false"
     );
+
+    uchar post_array[];
+    StringToCharArray(post_data, post_array, 0, StringLen(post_data));
+
+    // API host and path
+    string host = "api.telegram.org";
+    string path = StringFormat("/bot%s/sendMessage", bot_token);
+
+    // Open WinInet session
+    int hInternet = InternetOpenW("MT4 Telegram Client", 1, "", "", 0);
+    if(hInternet == 0)
+    {
+        Print("[Telegram] InternetOpenW failed");
+        return(false);
+    }
+
+    // Establish HTTPS connection
+    int hConnection = InternetConnectW(hInternet, host, 443, "", "", 3, 0, 0);
+    if(hConnection == 0)
+    {
+        Print("[Telegram] InternetConnectW failed");
+        InternetCloseHandle(hInternet);
+        return(false);
+    }
+
+    // Prepare HTTP POST request
+    int hRequest = HttpOpenRequestW(hConnection, "POST", path, "HTTP/1.1", "", "", 0x00800000, 0);
+    if(hRequest == 0)
+    {
+        Print("[Telegram] HttpOpenRequestW failed");
+        InternetCloseHandle(hConnection);
+        InternetCloseHandle(hInternet);
+        return(false);
+    }
+
+    string headers = "Content-Type: application/x-www-form-urlencoded\r\n";
+    bool sent = HttpSendRequestW(hRequest, headers, StringLen(headers), post_array, ArraySize(post_array));
+
+    // Clean up handles
+    InternetCloseHandle(hRequest);
+    InternetCloseHandle(hConnection);
+    InternetCloseHandle(hInternet);
+
+    if(!sent)
+    {
+        Print("[Telegram] HttpSendRequestW failed");
+    }
+
+    return(sent);
 }
 
 //+------------------------------------------------------------------+
-//| Format trade closed message                                      |
+//| Helper to format trade open notification                         |
 //+------------------------------------------------------------------+
-string FormatTradeClosedMessage(string symbol, double close_price, double profit_pips,
-                               double profit_amount, string currency, bool is_winner)
+string BuildTradeOpenedMessage(
+    const string symbol,
+    const string direction,
+    const double entry_price,
+    const double stop_loss,
+    const double take_profit,
+    const double lot_size,
+    const double risk_pct)
+{
+    string emoji = (direction == "BUY") ? "📈" : "📉";
+    return(StringFormat(
+        " %s Trade Opened\n"
+        "📊 %s %s\n"
+        "💱 Entry: %.5f\n"
+        "🛑 SL: %.5f\n"
+        "🎯 TP: %.5f\n"
+        "💰 Size: %.2f lots\n"
+        "📊 Risk: %.1f%%\n"
+        "⏰ %s",
+        emoji, symbol, direction,
+        entry_price, stop_loss, take_profit,
+        lot_size, risk_pct,
+        TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES)
+    ));
+}
+
+//+------------------------------------------------------------------+
+//| Helper to format trade close notification                        |
+//+------------------------------------------------------------------+
+string BuildTradeClosedMessage(
+    const string symbol,
+    const double close_price,
+    const double profit_pips,
+    const double profit_amount,
+    const string currency,
+    const bool is_winner)
 {
     string emoji = is_winner ? "✅" : "❌";
     string result = is_winner ? "WIN" : "LOSS";
-
-    return StringFormat(
-        "<b>%s Trade Closed - %s</b>\n"
-        "📊 <b>%s</b>\n"
-        "💱 Close: <code>%.5f</code>\n"
-        "📈 Pips: <code>%.1f</code>\n"
-        "💰 P/L: <code>%.2f %s</code>\n"
+    return(StringFormat(
+        " %s Trade Closed - %s\n"
+        "📊 %s\n"
+        "💱 Close: %.5f\n"
+        "📈 Pips: %.1f\n"
+        "💰 P/L: %.2f %s\n"
         "⏰ %s",
-        emoji, result, symbol, close_price, profit_pips,
-        profit_amount, currency, TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES)
-    );
+        emoji, result, symbol,
+        close_price, profit_pips, profit_amount, currency,
+        TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES)
+    ));
 }
 
 //+------------------------------------------------------------------+
-//| Format EA status message                                         |
+//| Helper to format EA status notification                          |
 //+------------------------------------------------------------------+
-string FormatEAStatusMessage(string ea_name, string symbol, double balance,
-                            string currency, double risk_pct, string status)
+string BuildEAStatusMessage(
+    const string ea_name,
+    const string symbol,
+    const double balance,
+    const string currency,
+    const double risk_pct,
+    const string status)
 {
     string emoji = (status == "Started") ? "🤖" : "🛑";
-
-    return StringFormat(
-        "<b>%s %s %s</b>\n"
-        "📊 Symbol: <code>%s</code>\n"
-        "💰 Balance: <code>%.2f %s</code>\n"
-        "⚙️ Risk: <code>%.1f%%</code>\n"
+    return(StringFormat(
+        " %s %s %s\n"
+        "📊 Symbol: %s\n"
+        "💰 Balance: %.2f %s\n"
+        "⚙️ Risk: %.1f%%\n"
         "⏰ %s",
-        emoji, ea_name, status, symbol, balance, currency,
-        risk_pct, TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES)
-    );
+        emoji, ea_name, status,
+        symbol, balance, currency,
+        risk_pct,
+        TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES)
+    ));
 }
 
 //+------------------------------------------------------------------+
-//| Format daily limit warning message                               |
+//| Helper to format daily limit notification                         |
 //+------------------------------------------------------------------+
-string FormatDailyLimitMessage(double loss_pct, double limit_pct)
+string BuildDailyLimitMessage(const double loss_pct, const double limit_pct)
 {
-    return StringFormat(
-        "<b>⚠️ Daily Loss Limit Reached</b>\n"
-        "📉 Current Loss: <code>%.2f%%</code>\n"
-        "🚫 Limit: <code>%.2f%%</code>\n"
+    return(StringFormat(
+        " ⚠️ Daily Loss Limit Reached\n"
+        "📉 Current Loss: %.2f%%\n"
+        "🚫 Limit: %.2f%%\n"
         "🕐 Trading disabled until tomorrow\n"
         "⏰ %s",
-        loss_pct, limit_pct, TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES)
-    );
+        loss_pct, limit_pct,
+        TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES)
+    ));
 }
